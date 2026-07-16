@@ -7,6 +7,7 @@ import {
   getListFilesQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { UploadCloud, FileText, Image as ImageIcon, FileArchive, Trash2, Download, Loader2 } from "lucide-react";
@@ -26,6 +27,7 @@ function iconFor(contentType: string) {
 
 export default function FilesHub({ workspaceId, canEdit }: { workspaceId: number; canEdit: boolean }) {
   const { toast } = useToast();
+  const { accessToken } = useAuth();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -46,13 +48,14 @@ export default function FilesHub({ workspaceId, canEdit }: { workspaceId: number
       const response = await fetch("/api/storage/uploads/local", {
         method: "POST",
         headers: {
+          Authorization: accessToken ? `Bearer ${accessToken}` : "",
           "X-File-Name": file.name,
           "X-File-Content-Type": file.type || "application/octet-stream",
           "X-File-Size": String(file.size),
         },
+        credentials: "include",
         body: file,
       });
-
       if (!response.ok) throw new Error("Upload to storage failed");
       const { objectPath } = await response.json();
 

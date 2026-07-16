@@ -36,24 +36,25 @@ import MeetingsPanel from "@/components/workspace/meetings-panel";
 import WorkspaceAnalytics from "@/components/workspace/workspace-analytics";
 import TopbarActions from "@/components/topbar-actions";
 import { useToast } from "@/hooks/use-toast";
-
+import { MessageCircle } from "lucide-react";
+import GroupChat from "@/components/workspace/group-chat";
 type Tab =
-  | "project"
+  | "analytics"
   | "planner"
   | "files"
   | "meetings"
   | "activity"
   | "members"
-  | "analytics";
+  | "chat";
 
 const TABS: { id: Tab; label: string; icon: typeof Layers }[] = [
-  { id: "project", label: "Project", icon: Layers },
+  { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "planner", label: "Task Planner", icon: ListChecks },
   { id: "files", label: "Files Hub", icon: FolderOpen },
   { id: "meetings", label: "Meetings", icon: CalendarClock },
   { id: "activity", label: "Activity", icon: Activity },
   { id: "members", label: "Members", icon: Users },
-  { id: "analytics", label: "Analytics", icon: BarChart3 },
+  { id: "chat", label: "Group Chat", icon: MessageCircle },
 ];
 
 export default function Workspace() {
@@ -72,7 +73,7 @@ export default function Workspace() {
   // Real-time socket
   const { connected, onlineUsers, cursors, locks, emitCursor, lockTask, unlockTask } = useWorkspaceSocket(workspaceId, accessToken);
 
-  const [activeTab, setActiveTab] = useState<Tab>("project");
+  const [activeTab, setActiveTab] = useState<Tab>("analytics");
 
   const canEdit = workspace?.myRole === "owner" || workspace?.myRole === "editor";
 
@@ -205,17 +206,8 @@ export default function Workspace() {
           onPointerMove={handlePointerMove}
           onPointerLeave={() => {}}
         >
-          {activeTab === "project" && workspace && (
-            <KanbanBoard
-              workspaceId={workspaceId}
-              tasks={tasks || []}
-              isLoading={tasksLoading}
-              myRole={workspace.myRole}
-              locks={locks}
-              lockTask={lockTask}
-              unlockTask={unlockTask}
-              currentUserId={user?.id}
-            />
+          {activeTab === "analytics" && workspace && (
+            <WorkspaceAnalytics workspaceId={workspaceId} />
           )}
 
           {activeTab === "planner" && workspace && (
@@ -244,8 +236,8 @@ export default function Workspace() {
             </div>
           )}
 
-          {activeTab === "analytics" && workspace && (
-            <WorkspaceAnalytics workspaceId={workspaceId} />
+          {activeTab === "chat" && workspace && (
+            <GroupChat workspaceId={workspaceId} />
           )}
 
           {/* Render cursors of other users on top of everything inside the main area */}

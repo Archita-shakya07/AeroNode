@@ -6,7 +6,7 @@ import tasksRouter from "./tasks";
 import storageRouter from "./storage";
 import filesRouter from "./files";
 import meetingsRouter from "./meetings";
-
+import messagesRouter from "./messages";
 const router: IRouter = Router();
 
 // storageRouter must be mounted before any router that applies a blanket
@@ -22,5 +22,6 @@ router.use(workspacesRouter);
 router.use(tasksRouter);
 router.use(filesRouter);
 router.use(meetingsRouter);
+router.use(messagesRouter);
 
 export default router;

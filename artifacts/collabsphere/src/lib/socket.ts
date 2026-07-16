@@ -10,32 +10,6 @@ import {
 } from '@workspace/api-client-react';
 import { useToast } from '@/hooks/use-toast';
 
-// ---------------------------------------------------------------------------
-// Real-time contract (Socket.IO, mounted at path "/api/socket.io/")
-//
-// Handshake: `io({ path: "/api/socket.io/", auth: { token: accessToken } })`
-// The server verifies the JWT access token at connection time and rejects
-// the socket if it's missing/invalid/expired.
-//
-// Client -> Server:
-//   "workspace:join"   { workspaceId: number }
-//   "workspace:leave"  { workspaceId: number }
-//   "cursor:move"      { workspaceId: number, x: number, y: number }  // x,y are 0-100 percentages of the board container
-//   "task:lock"        { workspaceId: number, taskId: number }
-//   "task:unlock"      { workspaceId: number, taskId: number }
-//
-// Server -> Client (broadcast to everyone in the workspace room):
-//   "presence:update"  { users: { userId: number, name: string, avatarColor: string }[] }
-//   "cursor:update"     { userId: number, name: string, avatarColor: string, x: number, y: number }
-//   "task:created"      { task: Task }
-//   "task:updated"       { task: Task }
-//   "task:deleted"       { taskId: number }
-//   "task:locked"        { taskId: number, userId: number, name: string }
-//   "task:unlocked"       { taskId: number }
-//   "activity:new"        { entry: ActivityEntry }
-//   "member:changed"       {}  // membership/role changed -- refetch workspace detail
-// ---------------------------------------------------------------------------
-
 export type PresenceUser = { userId: number; name: string; avatarColor: string };
 export type CursorState = {
   userId: number;
@@ -111,7 +85,8 @@ export function useWorkspaceSocket(workspaceId: number | null, accessToken: stri
       queryClient.invalidateQueries({ queryKey: getListActivityQueryKey(workspaceId) });
     const invalidateWorkspace = () =>
       queryClient.invalidateQueries({ queryKey: getGetWorkspaceQueryKey(workspaceId) });
-
+    const invalidateMessages = () =>
+      queryClient.invalidateQueries({ queryKey: ["messages", workspaceId] });
     const onTaskCreated = (payload: { task: Task }) => {
       invalidateTasks();
       toast({ title: 'New task', description: payload.task.title });
@@ -126,7 +101,8 @@ export function useWorkspaceSocket(workspaceId: number | null, accessToken: stri
       invalidateWorkspace();
       invalidateActivity();
     };
-
+    const onMessageNew = () => invalidateMessages();
+    const onMessageDeleted = () => invalidateMessages();
     socket.on('presence:update', onPresence);
     socket.on('cursor:update', onCursor);
     socket.on('task:locked', onTaskLocked);
@@ -136,6 +112,8 @@ export function useWorkspaceSocket(workspaceId: number | null, accessToken: stri
     socket.on('task:deleted', onTaskDeleted);
     socket.on('activity:new', onActivityNew);
     socket.on('member:changed', onMemberChanged);
+    socket.on('message:new', onMessageNew);
+    socket.on('message:deleted', onMessageDeleted);
 
     return () => {
       socket.emit('workspace:leave', { workspaceId });
@@ -150,6 +128,8 @@ export function useWorkspaceSocket(workspaceId: number | null, accessToken: stri
       socket.off('task:deleted', onTaskDeleted);
       socket.off('activity:new', onActivityNew);
       socket.off('member:changed', onMemberChanged);
+      socket.off('message:new', onMessageNew);
+      socket.off('message:deleted', onMessageDeleted);
       setOnlineUsers([]);
       setCursors({});
       setLocks({});

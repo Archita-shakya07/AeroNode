@@ -6,3 +6,4 @@ export * from "./tasks";
 export * from "./activity-log";
 export * from "./files";
 export * from "./meetings";
+export * from "./messages";
