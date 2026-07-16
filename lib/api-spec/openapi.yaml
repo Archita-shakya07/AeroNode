@@ -1,0 +1,983 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: AeroNode API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: workspaces
+    description: Workspace (room) operations
+  - name: tasks
+    description: Kanban task operations
+  - name: storage
+    description: Object storage upload and serving endpoints
+  - name: files
+    description: Files Hub operations
+  - name: meetings
+    description: Meeting scheduling operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/signup:
+    post:
+      operationId: signup
+      tags: [auth]
+      summary: Create a new account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupInput"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+
+  /auth/refresh:
+    post:
+      operationId: refresh
+      tags: [auth]
+      summary: Rotate the refresh token and mint a new access token
+      responses:
+        "200":
+          description: New access token issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthRefreshResult"
+        "401":
+          description: Missing or invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Revoke the current refresh token
+      responses:
+        "204":
+          description: Logged out
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get the current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+
+  /workspaces:
+    get:
+      operationId: listWorkspaces
+      tags: [workspaces]
+      summary: List workspaces the current user belongs to
+      responses:
+        "200":
+          description: Workspaces
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceSummary"
+    post:
+      operationId: createWorkspace
+      tags: [workspaces]
+      summary: Create a new workspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspaceInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceSummary"
+
+  /workspaces/{id}:
+    get:
+      operationId: getWorkspace
+      tags: [workspaces]
+      summary: Get workspace detail including members
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Workspace detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceDetail"
+        "403":
+          description: Not a member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+    patch:
+      operationId: updateWorkspace
+      tags: [workspaces]
+      summary: Update workspace name/description (owner only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspaceUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceDetail"
+        "403":
+          description: Not permitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+    delete:
+      operationId: deleteWorkspace
+      tags: [workspaces]
+      summary: Delete a workspace (owner only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Not permitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+
+  /workspaces/{id}/members:
+    post:
+      operationId: addWorkspaceMember
+      tags: [workspaces]
+      summary: Add a registered user to the workspace by email (owner only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberInput"
+      responses:
+        "201":
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceMember"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "409":
+          description: Already a member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+
+  /workspaces/{id}/members/{userId}:
+    patch:
+      operationId: updateMemberRole
+      tags: [workspaces]
+      summary: Change a member's role (owner only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberRoleUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceMember"
+    delete:
+      operationId: removeMember
+      tags: [workspaces]
+      summary: Remove a member from the workspace (owner only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+
+  /workspaces/{id}/activity:
+    get:
+      operationId: listActivity
+      tags: [workspaces]
+      summary: List the 100 most recent activity log entries for a workspace
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Activity entries, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityEntry"
+
+  /workspaces/{id}/export:
+    get:
+      operationId: exportWorkspace
+      tags: [workspaces]
+      summary: Export a workspace's full data as JSON
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Workspace export bundle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceExport"
+
+  /workspaces/{id}/tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: List all tasks in a workspace
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+    post:
+      operationId: createTask
+      tags: [tasks]
+      summary: Create a task in a workspace
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /tasks/{id}:
+    patch:
+      operationId: updateTask
+      tags: [tasks]
+      summary: Update a task (optimistic concurrency via version)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "409":
+          description: Version conflict — someone else already updated this task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionConflict"
+    delete:
+      operationId: deleteTask
+      tags: [tasks]
+      summary: Delete a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [storage]
+      summary: Request a presigned URL for file upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Presigned upload URL generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
+          description: Missing or invalid required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+
+  /workspaces/{id}/files:
+    get:
+      operationId: listFiles
+      tags: [files]
+      summary: List files uploaded to a workspace
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Files
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FileItem"
+    post:
+      operationId: createFile
+      tags: [files]
+      summary: Record a file uploaded to a workspace (after the presigned upload completes)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FileInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileItem"
+
+  /files/{id}:
+    delete:
+      operationId: deleteFile
+      tags: [files]
+      summary: Delete a file record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /workspaces/{id}/meetings:
+    get:
+      operationId: listMeetings
+      tags: [meetings]
+      summary: List meetings scheduled in a workspace
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Meetings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Meeting"
+    post:
+      operationId: createMeeting
+      tags: [meetings]
+      summary: Schedule a meeting in a workspace
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeetingInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Meeting"
+
+  /meetings/{id}:
+    patch:
+      operationId: updateMeeting
+      tags: [meetings]
+      summary: Update a scheduled meeting
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeetingUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Meeting"
+    delete:
+      operationId: deleteMeeting
+      tags: [meetings]
+      summary: Delete a scheduled meeting
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /auth/me/profile:
+    patch:
+      operationId: updateProfile
+      tags: [auth]
+      summary: Update the current user's name and/or avatar color
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileInput"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /auth/me/password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      summary: Change the current user's password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordInput"
+      responses:
+        "204":
+          description: Password changed
+        "401":
+          description: Current password incorrect
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorMessage:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Role:
+      type: string
+      enum: [owner, editor, viewer]
+
+    TaskStatus:
+      type: string
+      enum: [todo, in_progress, done]
+
+    TaskPriority:
+      type: string
+      enum: [low, medium, high, urgent]
+
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        avatarColor: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, name, email, avatarColor, createdAt]
+
+    SignupInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string }
+        password: { type: string, minLength: 8 }
+      required: [name, email, password]
+
+    LoginInput:
+      type: object
+      properties:
+        email: { type: string }
+        password: { type: string, minLength: 1 }
+      required: [email, password]
+
+    AuthResult:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        accessToken: { type: string }
+      required: [user, accessToken]
+
+    AuthRefreshResult:
+      type: object
+      properties:
+        accessToken: { type: string }
+      required: [accessToken]
+
+    WorkspaceInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: ["string", "null"] }
+      required: [name]
+
+    WorkspaceUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: ["string", "null"] }
+
+    WorkspaceSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        role:
+          $ref: "#/components/schemas/Role"
+        memberCount: { type: integer }
+        taskCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required:
+        [id, name, description, role, memberCount, taskCount, createdAt, updatedAt]
+
+    WorkspaceMember:
+      type: object
+      properties:
+        id: { type: integer }
+        userId: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        avatarColor: { type: string }
+        role:
+          $ref: "#/components/schemas/Role"
+        joinedAt: { type: string, format: date-time }
+      required: [id, userId, name, email, avatarColor, role, joinedAt]
+
+    WorkspaceDetail:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        myRole:
+          $ref: "#/components/schemas/Role"
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkspaceMember"
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, name, description, myRole, members, createdAt, updatedAt]
+
+    MemberInput:
+      type: object
+      properties:
+        email: { type: string }
+        role:
+          $ref: "#/components/schemas/Role"
+      required: [email, role]
+
+    MemberRoleUpdate:
+      type: object
+      properties:
+        role:
+          $ref: "#/components/schemas/Role"
+      required: [role]
+
+    ActivityEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        workspaceId: { type: integer }
+        userId: { type: integer }
+        userName: { type: string }
+        message: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, workspaceId, userId, userName, message, createdAt]
+
+    Task:
+      type: object
+      properties:
+        id: { type: integer }
+        workspaceId: { type: integer }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        status:
+          $ref: "#/components/schemas/TaskStatus"
+        priority:
+          $ref: "#/components/schemas/TaskPriority"
+        dueDate: { type: ["string", "null"], format: date-time }
+        order: { type: integer }
+        assigneeId: { type: ["integer", "null"] }
+        assigneeName: { type: ["string", "null"] }
+        createdBy: { type: integer }
+        lockedBy: { type: ["integer", "null"] }
+        lockedByName: { type: ["string", "null"] }
+        version: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required:
+        [id, workspaceId, title, description, status, priority, dueDate, order, assigneeId, assigneeName,
+         createdBy, lockedBy, lockedByName, version, createdAt, updatedAt]
+
+    TaskInput:
+      type: object
+      properties:
+        title: { type: string, minLength: 1 }
+        description: { type: ["string", "null"] }
+        status:
+          $ref: "#/components/schemas/TaskStatus"
+        priority:
+          $ref: "#/components/schemas/TaskPriority"
+        dueDate: { type: ["string", "null"], format: date-time }
+        assigneeId: { type: ["integer", "null"] }
+      required: [title]
+
+    TaskUpdate:
+      type: object
+      properties:
+        title: { type: string, minLength: 1 }
+        description: { type: ["string", "null"] }
+        status:
+          $ref: "#/components/schemas/TaskStatus"
+        priority:
+          $ref: "#/components/schemas/TaskPriority"
+        dueDate: { type: ["string", "null"], format: date-time }
+        order: { type: integer }
+        assigneeId: { type: ["integer", "null"] }
+        version: { type: integer }
+      required: [version]
+
+    VersionConflict:
+      type: object
+      properties:
+        error: { type: string }
+        task:
+          $ref: "#/components/schemas/Task"
+      required: [error, task]
+
+    WorkspaceExport:
+      type: object
+      properties:
+        workspace:
+          $ref: "#/components/schemas/WorkspaceDetail"
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+        activity:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityEntry"
+        exportedAt: { type: string, format: date-time }
+      required: [workspace, tasks, activity, exportedAt]
+
+    UploadUrlRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        size: { type: integer, minimum: 1 }
+        contentType: { type: string, minLength: 1 }
+      required: [name, size, contentType]
+
+    UploadUrlResponse:
+      type: object
+      properties:
+        uploadURL: { type: string }
+        objectPath: { type: string }
+      required: [uploadURL, objectPath]
+
+    FileItem:
+      type: object
+      properties:
+        id: { type: integer }
+        workspaceId: { type: integer }
+        fileName: { type: string }
+        objectPath: { type: string }
+        contentType: { type: string }
+        size: { type: integer }
+        uploadedBy: { type: integer }
+        uploadedByName: { type: string }
+        createdAt: { type: string, format: date-time }
+      required:
+        [id, workspaceId, fileName, objectPath, contentType, size, uploadedBy, uploadedByName, createdAt]
+
+    FileInput:
+      type: object
+      properties:
+        fileName: { type: string, minLength: 1 }
+        objectPath: { type: string, minLength: 1 }
+        contentType: { type: string, minLength: 1 }
+        size: { type: integer, minimum: 0 }
+      required: [fileName, objectPath, contentType, size]
+
+    Meeting:
+      type: object
+      properties:
+        id: { type: integer }
+        workspaceId: { type: integer }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        scheduledAt: { type: string, format: date-time }
+        durationMinutes: { type: integer }
+        meetingLink: { type: ["string", "null"] }
+        createdBy: { type: integer }
+        createdByName: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required:
+        [id, workspaceId, title, description, scheduledAt, durationMinutes, meetingLink,
+         createdBy, createdByName, createdAt, updatedAt]
+
+    MeetingInput:
+      type: object
+      properties:
+        title: { type: string, minLength: 1 }
+        description: { type: ["string", "null"] }
+        scheduledAt: { type: string, format: date-time }
+        durationMinutes: { type: integer, minimum: 5 }
+        meetingLink: { type: ["string", "null"] }
+      required: [title, scheduledAt]
+
+    MeetingUpdate:
+      type: object
+      properties:
+        title: { type: string, minLength: 1 }
+        description: { type: ["string", "null"] }
+        scheduledAt: { type: string, format: date-time }
+        durationMinutes: { type: integer, minimum: 5 }
+        meetingLink: { type: ["string", "null"] }
+
+    UpdateProfileInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        avatarColor: { type: string, minLength: 1 }
+
+    ChangePasswordInput:
+      type: object
+      properties:
+        currentPassword: { type: string, minLength: 1 }
+        newPassword: { type: string, minLength: 8 }
+      required: [currentPassword, newPassword]

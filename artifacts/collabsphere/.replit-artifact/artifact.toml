@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "CollabSphere"
+version = "1.0.0"
+id = "artifacts/collabsphere"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25145
+
+[services.development]
+run = "pnpm --filter @workspace/collabsphere run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/collabsphere", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/collabsphere/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25145"
+BASE_PATH = "/"
