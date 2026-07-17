@@ -25,7 +25,7 @@ let sharedSocket: Socket | null = null;
 function getSharedSocket(token: string): Socket {
   if (sharedSocket && sharedSocket.connected) return sharedSocket;
   if (sharedSocket) sharedSocket.disconnect();
-  sharedSocket = io({
+  sharedSocket = io(import.meta.env.VITE_API_URL ?? undefined, {
     path: '/api/socket.io/',
     auth: { token },
     transports: ['websocket', 'polling'],

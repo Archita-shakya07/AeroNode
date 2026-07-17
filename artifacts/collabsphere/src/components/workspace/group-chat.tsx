@@ -34,7 +34,7 @@ export default function GroupChat({ workspaceId }: { workspaceId: number }) {
   } = useQuery<ChatMessage[]>({
     queryKey: messagesKey,
     queryFn: async () => {
-      const res = await fetch(`/api/workspaces/${workspaceId}/messages`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ""}/api/workspaces/${workspaceId}/messages`, {
         headers: {
           Authorization: accessToken ? `Bearer ${accessToken}` : "",
         },
@@ -59,7 +59,7 @@ export default function GroupChat({ workspaceId }: { workspaceId: number }) {
 
   const sendMessage = useMutation({
     mutationFn: async (content: string) => {
-      const res = await fetch(`/api/workspaces/${workspaceId}/messages`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ""}/api/workspaces/${workspaceId}/messages`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

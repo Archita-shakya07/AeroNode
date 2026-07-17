@@ -45,7 +45,7 @@ export default function FilesHub({ workspaceId, canEdit }: { workspaceId: number
 
     setIsUploading(true);
     try {
-      const response = await fetch("/api/storage/uploads/local", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL ?? ""}/api/storage/uploads/local`, {
         method: "POST",
         headers: {
           Authorization: accessToken ? `Bearer ${accessToken}` : "",
