@@ -5,10 +5,9 @@ import App from './App';
 
 import './index.css';
 
-const apiBaseUrl = import.meta.env.VITE_API_URL;
+// 🛠️ Yahan humne aapka live Render backend URL directly set kar diya hai
+const apiBaseUrl = import.meta.env.VITE_API_URL || "https://aeronode-9t5a.onrender.com";
 
-if (apiBaseUrl) {
-  setBaseUrl(apiBaseUrl);
-}
+setBaseUrl(apiBaseUrl);
 
 createRoot(document.getElementById('root')!).render(<App />);
