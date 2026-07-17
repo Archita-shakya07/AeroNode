@@ -4,6 +4,8 @@ import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import path from "node:path";
+import { existsSync } from "node:fs";
 
 const app: Express = express();
 
@@ -32,6 +34,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+const clientDist = path.resolve(__dirname, "../../collabsphere/dist/public");
+if (existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get(/^(?!\/api).*/, (req, res) => {
+    res.sendFile(path.join(clientDist, "index.html"));
+  });
+}
 
 const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   logger.error({ err: { message: err?.message, stack: err?.stack } }, "Unhandled error");
