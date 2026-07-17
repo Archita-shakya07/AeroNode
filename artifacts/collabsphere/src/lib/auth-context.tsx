@@ -17,16 +17,6 @@ import {
   type User,
 } from '@workspace/api-client-react';
 
-// ---------------------------------------------------------------------------
-// Why this shape: the access token is a short-lived JWT (15 min) kept only in
-// memory (never localStorage) so it can't be stolen via XSS-persisted
-// storage. The refresh token lives in an httpOnly cookie the browser sends
-// automatically — JS never touches it. On load, and every 10 minutes while
-// logged in, we silently call /auth/refresh to rotate the refresh token and
-// mint a new access token. If the refresh cookie is missing/expired, refresh
-// fails and the user is treated as logged out.
-// ---------------------------------------------------------------------------
-
 type AuthContextValue = {
   user: User | null;
   accessToken: string | null;
@@ -51,8 +41,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [accessToken]);
 
   useEffect(() => {
-    // Registered once: every generated API call attaches this as
-    // `Authorization: Bearer <token>` when present.
     setAuthTokenGetter(() => tokenRef.current);
     return () => setAuthTokenGetter(null);
   }, []);
@@ -81,20 +69,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const result = await apiLogin({ email, password });
-    setAccessToken(result.accessToken);
-    tokenRef.current = result.accessToken;
-    setUser(result.user);
-    return result.user;
-  }, []);
-
-  const signup = useCallback(
-    async (name: string, email: string, password: string) => {
-      const result = await apiSignup({ name, email, password });
+    console.log('[DEBUG] VITE_API_URL =', import.meta.env.VITE_API_URL);
+    console.log('[DEBUG] calling apiLogin...');
+    try {
+      const result = await apiLogin({ email, password });
+      console.log('[DEBUG] apiLogin resolved:', result);
       setAccessToken(result.accessToken);
       tokenRef.current = result.accessToken;
       setUser(result.user);
       return result.user;
+    } catch (err) {
+      console.log('[DEBUG] apiLogin threw:', err);
+      throw err;
+    }
+  }, []);
+
+  const signup = useCallback(
+    async (name: string, email: string, password: string) => {
+      console.log('[DEBUG] VITE_API_URL =', import.meta.env.VITE_API_URL);
+      console.log('[DEBUG] calling apiSignup...');
+      try {
+        const result = await apiSignup({ name, email, password });
+        console.log('[DEBUG] apiSignup resolved:', result);
+        setAccessToken(result.accessToken);
+        tokenRef.current = result.accessToken;
+        setUser(result.user);
+        return result.user;
+      } catch (err) {
+        console.log('[DEBUG] apiSignup threw:', err);
+        throw err;
+      }
     },
     [],
   );
